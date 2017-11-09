@@ -8,6 +8,7 @@ HSRはwifiをaibotに接続しておいたので、**ホストPCのwifiの接続
     $rosrun rviz rviz
 
 rvizが起動したら、addからrobot_modelとmapを追加しておく。マップのトピックは  
+![rviz](https://github.com/TANUKIpro/img_dock/blob/master/rviz.png)
 (Tool Propertiesの2D Pose EstimateのTopicを /laser_2d_correct_pose に変更すること)  
 
 別のターミナルを開いて  
