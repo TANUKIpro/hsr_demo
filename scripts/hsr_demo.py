@@ -28,6 +28,7 @@ from yolo_tf.msg import ObjectArray
 from sensor_msgs.msg import Image , CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 from yolo_tf.msg import ObjectArray
+from geometry_msgs.msg import PoseStamped, PointStamped
 
 robot = Robot()
 omni_base = robot.try_get('omni_base')
@@ -39,6 +40,8 @@ gripper = robot.try_get('gripper')
 wrist_wrench = robot.try_get('wrist_wrench')
 marker = robot.try_get('marker')
 battery = robot.try_get('battery')
+
+tr = yl.TreeReader()
 
 INTRO_SENARIO = [
    (u'こんにちは！僕はトヨタで作られた、暮らしをサポートするパートナーロボット。HSRです。'),
@@ -143,12 +146,14 @@ class Demo():
 class Grep_the_bottle():
     def __init__(self):
         tts.language = tts.ENGLISH
-        #tts.say('go to table')
-        omni_base.go(0.18838, 1.60785, -3.08466,20,relative=False)
+        tts.say('go to table')
+        omni_base.go(-0.38838, 1.60785, -3.08466,20,relative=False)
+        rospy.sleep(1)
+        whole_body.move_to_neutral()
+        gripper.grasp(0.01)
         
-#>>>========================================<<<
         self.flag = False
-#>>>========================================<<<
+
         self.bridge = CvBridge()
         self.pinhole= image_geometry.PinholeCameraModel()
         self._tf_buffer = tf2_ros.Buffer()
@@ -159,35 +164,36 @@ class Grep_the_bottle():
         depthsub = message_filters.Subscriber('/hsrb/head_rgbd_sensor/depth_registered/image', Image)
         image_person = message_filters.Subscriber('/hsrb/head_rgbd_sensor/rgb/image_color', Image) 
         ts = message_filters.ApproximateTimeSynchronizer([objsub, depthsub , image_person], 100 , 0.3)
-        ts.registerCallback(self.find_person)
+        ts.registerCallback(self.find_object)
         
     def camera(self, data):
         self.pinhole.fromCameraInfo(data)
+        #print('callback camera')
         
     def find_object(self, object, depth, image):
         result_array = []
         for pobj in object.objects:
-           if (self.flag):          #<<<=====
+           if (self.flag):      #<===================================
+               print('callback5')
                break
            person_probability = tr.probability(pobj.class_probability, "smelling bottle")
            person_probability *= pobj.objectness
            if person_probability < 0.001:
                continue
-           
            top = pobj.top
            left = pobj.left
            bottom = pobj.bottom
            right = pobj.right
            change_dep = self.bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
            self.depth = change_dep
-           self.person_follow(top , bottom , right , left , self.depth , object)
+           self.distance_from_bottle(top , bottom , right , left , self.depth , object)
         
     def distance_from_bottle(self , top , bottom , right , left , depth , objarr):
         y = int((top + bottom)/2)
         x = int((left + right)/2)
         ray = self.pinhole.projectPixelTo3dRay([x , y])
         camera_point = np.array(ray) * depth[y , x]
-        
+        print('callback2')
         pointstamped = PointStamped()
         
         pointstamped.header.stamp = rospy.Time.now()
@@ -199,28 +205,33 @@ class Grep_the_bottle():
         try:
             pointstamped = self._tf_buffer.transform(pointstamped , "base_footprint" , timeout = rospy.Duration(5))
             print pointstamped.point
-            tts.say("try to take the bottle")
+            #tts.say("try to take the bottle")
             whole_body.move_end_effector_pose(((pointstamped.point.x+0.02,pointstamped.point.y,pointstamped.point.z),(math.sqrt(2)/2,0,math.sqrt(2)/2,0)))
             gripper.grasp(-0.01)
             omni_base.go(-0.4,0,0,10,relative=True)
             whole_body.move_to_go()
-#>>>=========================================================<<<
             self.flag = True
-#>>>=========================================================<<<
+
             omni_base.go(1.48420, 1.75561, 1.56843,20,relative=False)
             whole_body.move_to_neutral()
             gripper.command(1)
             rospy.sleep(2)
             tts.say(u'やったね！')
             
-            whole_body.move_end_effector_pose(((pointstamped.point.x+0.02,pointstamped.point.y,pointstamped.point.z),(math.sqrt(2)/2,0,math.sqrt(2)/2,0)))
+            #whole_body.move_end_effector_pose(((pointstamped.point.x-0.02,pointstamped.point.y,pointstamped.point.z),(math.sqrt(2)/2,0,math.sqrt(2)/2,0)))
             gripper.grasp(0.01)
             whole_body.move_to_neutral()
-            omni_base.go_abs(1.60, 1.73, 1.57, 180.0)
-            rospy.sleep(1)
+            rospy.sleep(20)
+            
+            rospy.logerr('success grep_the_bottle')
             
             whole_body.move_to_neutral()
             whole_body.move_to_joint_positions({"head_tilt_joint":0.2})
+            
+            omni_base.go(1.4842096504348206, 1.7556134149575287, 1.568438660836788,20,relative=False)
+            whole_body.move_to_neutral()
+            gripper.command(1)
+            
             tts.say(u'どうだった？今のペットボトルをつかむという動作において、とっても沢山のセンサーを使ったんだ。')
             rospy.sleep(32)
             tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
@@ -228,14 +239,14 @@ class Grep_the_bottle():
             
         except:
             rospy.logerr('faild')
-            tts.say(u'ほえーー！なんかエラー出た！本当はペットボトルをつかむという動作において、とっても沢山のセンサーを使うんだ。')
+            #tts.say(u'ほえーー！なんかエラー出た！本当はペットボトルをつかむという動作において、とっても沢山のセンサーを使うんだ。')
             rospy.sleep(32)
-            tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
+            #tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
             rospy.sleep(51)
             
 def main():
     demo = Demo()
-    
+    """
     demo.intro()#intro
     rospy.sleep(3)
     
@@ -247,10 +258,10 @@ def main():
     demo.what_can_i_do()#what_can_i_do
     print('success what_can_i_do')
     rospy.sleep(5)
-    
+    """
     Grep_the_bottle()#grep_the_bottle
-    rospy.logerr('success grep_the_bottle')
-    
+    gripper.command(1)
+    """
     tts.say(u'次はロボット工房の案内をするよ！')
     rospy.sleep(6)
     
@@ -266,20 +277,18 @@ def main():
         demo.say_and_sleep(unit)
     print('success end_talk')
     rospy.sleep(2)
-    
+    """
 if __name__=='__main__':
     try:
         whole_body.move_to_go()
     except:
         rospy.logerr('Fail move_to_neutral')
     main()
-    
-    rospy.logerr('Fail what_can_i_do')
     tts.language = tts.ENGLISH
-    tts.say('All senario have ended. Move to the origin.')
-    rospy.sleep(3)
+    #tts.say('All senario have ended. Move to the origin.')
+    rospy.sleep(50)
     tts.language = tts.JAPANESE
-    omni_base.go_abs(-0.7, 0, 0, 180.0)
+    #omni_base.go_abs(-0.7, 0, 0, 180.0)
     whole_body.move_to_neutral()
     
     rospy.logerr('Finish')
