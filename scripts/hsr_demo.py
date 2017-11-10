@@ -3,24 +3,48 @@
 
 import sys, os
 import rospy
+import tf2_ros
+import math
+import cv2
+import datetime
+import roslib
+import tf2_geometry_msgs
+import message_filters
+import numpy as np
+import image_geometry
+import tf2_geometry_msgs
+import controller_manager_msgs.srv
+import threading
+import yolo_tf.libs as yl
+from roslib import message
+from math import copysign
 from hsrb_interface import Robot
+from hsrb_interface import geometry
+from std_msgs.msg import *
+from collections import OrderedDict
+from geometry_msgs.msg import PoseStamped, Twist
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from yolo_tf.msg import ObjectArray
+from sensor_msgs.msg import Image , CameraInfo
+from cv_bridge import CvBridge, CvBridgeError
+from yolo_tf.msg import ObjectArray
 
 robot = Robot()
 omni_base = robot.try_get('omni_base')
 tts = robot.try_get('default_tts')
 whole_body = robot.try_get('whole_body')
+collision_world = robot.try_get('global_collision_world')
+suction = robot.try_get('suction')
+gripper = robot.try_get('gripper')
+wrist_wrench = robot.try_get('wrist_wrench')
+marker = robot.try_get('marker')
+battery = robot.try_get('battery')
 
 INTRO_SENARIO = [
    (u'こんにちは！僕はトヨタで作られた、暮らしをサポートするパートナーロボット。HSRです。'),
    (u'今日はロボット工房に足を運んでくれてありがとう！'),
    (u'久しぶりのお客さんなので、少し緊張ぎみかも。失敗したら、ごめんね？'),
    (u'それじゃあロボット工房のデモプログラムを開始するよ！'),]
-
-NAVI_SENARIO = [
-   ((1.60, 1.73, 1.57, 180.0), u'ここは一般の家庭のリビングを想定した場所だよ。テーブルやソファー、冷蔵庫があるのはそれが理由なんだ。'),#客の前
-   ((-0.56, -1.268, 3.14, 180.0), u'ここはヒロをコントロールするパソコンが置いてあるよ！今、ヒロが動いてるのはここでスクリプトを書いたおかげなんだ！'),#八木_wsのところ
-   ((3.39, -1.4545, 1.57, 180.0), u'ここは本棚。難しい本がたくさん並んでいるね！僕にはわかんないや！'),#本棚のところ
-   ((2.366, 1.081, -1.57, 180.0), u'ここはガラスのテーブルとソファー。普段のロボット工房でここに来ると、頭を抱えている人に会えるかも！？')]#テーブルの前
 
 END_TALK_SENARIO = [
    (u'以上でロボット工房のデモプログラムを終了します。'),
@@ -30,6 +54,12 @@ END_TALK_SENARIO = [
    (u'話が長くなっちゃったね。今日は本当にありがとう。'),
    (u'最後に。現在ロボット工房では、僕達と一緒にHSRの研究をしてくれるメンバーを募集中です。興味がある方はお近くのスタッフまでー！')]
 
+NAVI_SENARIO = [
+   ((1.60, 1.73, 1.57, 180.0), u'ここは一般の家庭のリビングを想定した場所だよ。テーブルやソファー、冷蔵庫があるのはそれが理由なんだ。'),#客の前
+   ((-0.56, -1.268, 3.14, 180.0), u'ここはヒロをコントロールするパソコンが置いてあるよ！今、ヒロが動いてるのはここでスクリプトを書いたおかげなんだ！'),#八木_wsのところ
+   ((3.39, -1.4545, 1.57, 180.0), u'ここは本棚。難しい本がたくさん並んでいるね！僕にはわかんないや！'),#本棚のところ
+   ((2.366, 1.081, -1.57, 180.0), u'ここはガラスのテーブルとソファー。普段のロボット工房でここに来ると、頭を抱えている人に会えるかも！？')]#テーブルの前
+
 class Demo():
     def say_and_sleep(self, contents=''):
         tts.say(contents)
@@ -37,9 +67,8 @@ class Demo():
         rospy.logerr('callback')
         
     def intro(self):
-        self.status = None
         try:
-            omni_base.go_abs(-0.7, 0, 0, 180.0)     #front of the door point
+            omni_base.go_abs(-0.7, 0, 0, 180.0)     #front of the door
             tts.language = tts.ENGLISH
             tts.say(u'Demo start')
             rospy.sleep(3)
@@ -52,7 +81,6 @@ class Demo():
             tts.say(u'ほえーーー！introは失敗')
             
             self.status = Faild
-            return self.status
             
     def what_can_i_do(self):
         try:
@@ -79,7 +107,6 @@ class Demo():
             omni_base.go_abs(1.60, 1.73, 3.14, 180.0)
             rospy.logerr('success what_can_i_do')
             rospy.sleep(20)
-            
             
         except:
             rospy.logerr('Fail what_can_i_do')
@@ -116,9 +143,12 @@ class Demo():
 class Grep_the_bottle():
     def __init__(self):
         tts.language = tts.ENGLISH
-        tts.say('go to table')
+        #tts.say('go to table')
         omni_base.go(0.18838, 1.60785, -3.08466,20,relative=False)
         
+#>>>========================================<<<
+        self.flag = False
+#>>>========================================<<<
         self.bridge = CvBridge()
         self.pinhole= image_geometry.PinholeCameraModel()
         self._tf_buffer = tf2_ros.Buffer()
@@ -137,7 +167,7 @@ class Grep_the_bottle():
     def find_object(self, object, depth, image):
         result_array = []
         for pobj in object.objects:
-           if (self.flag):
+           if (self.flag):          #<<<=====
                break
            person_probability = tr.probability(pobj.class_probability, "smelling bottle")
            person_probability *= pobj.objectness
@@ -157,15 +187,15 @@ class Grep_the_bottle():
         x = int((left + right)/2)
         ray = self.pinhole.projectPixelTo3dRay([x , y])
         camera_point = np.array(ray) * depth[y , x]
-
+        
         pointstamped = PointStamped()
-
+        
         pointstamped.header.stamp = rospy.Time.now()
         pointstamped.header.frame_id = objarr.header.frame_id
         pointstamped.point.x = camera_point[0]
         pointstamped.point.y = camera_point[1]
         pointstamped.point.z = camera_point[2]
-
+        
         try:
             pointstamped = self._tf_buffer.transform(pointstamped , "base_footprint" , timeout = rospy.Duration(5))
             print pointstamped.point
@@ -174,13 +204,35 @@ class Grep_the_bottle():
             gripper.grasp(-0.01)
             omni_base.go(-0.4,0,0,10,relative=True)
             whole_body.move_to_go()
+#>>>=========================================================<<<
             self.flag = True
+#>>>=========================================================<<<
             omni_base.go(1.48420, 1.75561, 1.56843,20,relative=False)
             whole_body.move_to_neutral()
             gripper.command(1)
+            rospy.sleep(2)
+            tts.say(u'やったね！')
+            
+            whole_body.move_end_effector_pose(((pointstamped.point.x+0.02,pointstamped.point.y,pointstamped.point.z),(math.sqrt(2)/2,0,math.sqrt(2)/2,0)))
+            gripper.grasp(0.01)
+            whole_body.move_to_neutral()
+            omni_base.go_abs(1.60, 1.73, 1.57, 180.0)
+            rospy.sleep(1)
+            
+            whole_body.move_to_neutral()
+            whole_body.move_to_joint_positions({"head_tilt_joint":0.2})
+            tts.say(u'どうだった？今のペットボトルをつかむという動作において、とっても沢山のセンサーを使ったんだ。')
+            rospy.sleep(32)
+            tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
+            rospy.sleep(51)
+            
         except:
             rospy.logerr('faild')
-        
+            tts.say(u'ほえーー！なんかエラー出た！本当はペットボトルをつかむという動作において、とっても沢山のセンサーを使うんだ。')
+            rospy.sleep(32)
+            tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
+            rospy.sleep(51)
+            
 def main():
     demo = Demo()
     
@@ -195,6 +247,12 @@ def main():
     demo.what_can_i_do()#what_can_i_do
     print('success what_can_i_do')
     rospy.sleep(5)
+    
+    Grep_the_bottle()#grep_the_bottle
+    rospy.logerr('success grep_the_bottle')
+    
+    tts.say(u'次はロボット工房の案内をするよ！')
+    rospy.sleep(6)
     
     for unit in NAVI_SENARIO:#navi
         demo.navi(unit[0], unit[1])
