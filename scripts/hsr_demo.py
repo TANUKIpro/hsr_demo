@@ -19,14 +19,14 @@ INTRO_SENARIO = [
 NAVI_SENARIO = [
    ((1.60, 1.73, 1.57, 180.0), u'ここは一般の家庭のリビングを想定した場所だよ。テーブルやソファー、冷蔵庫があるのはそれが理由なんだ。'),#客の前
    ((-0.56, -1.268, 3.14, 180.0), u'ここはヒロをコントロールするパソコンが置いてあるよ！今、ヒロが動いてるのはここでスクリプトを書いたおかげなんだ！'),#八木_wsのところ
-   ((3.39, -1.4545, -1.57, 180.0), u'ここは本棚。難しい本がたくさん並んでいるね！僕にはわかんないや！'),#本棚のところ
-   ((2.366, 1.081, -1.57, 180.0), u'ここはガラスのテーブル。普段のロボット工房でここに来ると、頭を抱えている人に会えるかも！？')]#テーブルの前
+   ((3.39, -1.4545, 1.57, 180.0), u'ここは本棚。難しい本がたくさん並んでいるね！僕にはわかんないや！'),#本棚のところ
+   ((2.366, 1.081, -1.57, 180.0), u'ここはガラスのテーブルとソファー。普段のロボット工房でここに来ると、頭を抱えている人に会えるかも！？')]#テーブルの前
 
 END_TALK_SENARIO = [
-   (u'')
-   (u'ここからは')
-   (u'')
-   (u'')
+   (u''),
+   (u'ここからは'),
+   (u''),
+   (u''),
    (u'')]
 
 class Demo():
@@ -55,19 +55,46 @@ class Demo():
         try:
             tts.say(u'まず僕の一通りの機能を紹介するよ')
             rospy.sleep(5)
+            tts.say(u'まずは僕の足！先輩のASHIMOさんみたいに素敵な足はついてないけど、かわりにオムニホイールっていう、その場から全方向に移動可能な足がついてるんだ')
+            rospy.sleep(45)
+            tts.say(u'こんな風にその場で回ったり')
+            omni_base.go_abs(1.60, 1.73, -1.57, 180.0)
+            omni_base.go_abs(1.60, 1.73, 1.57, 180.0)
+            
+            tts.say(u'左右に移動できるんだ')
+            omni_base.go_abs(1.60+0.7, 1.73, 1.57, 180.0)
+            omni_base.go_abs(1.60-0.7, 1.73, 1.57, 180.0)
+            
+            
         except:
             rospy.logerr('Fail what_can_i_do')
+            tts.language = tts.ENGLISH
+            tts.say('faild what can i do')
+            tts.language = tts.JAPANESE
+            omni_base.go_abs(0, 0, 0, 180.0)
             
     def navi(self, pos=(0, 0, 0), contents=''):
         try:
             omni_base.go_abs(pos[0], pos[1], pos[2], 180.0)
         except:
             rospy.logerr('Fail navi')
+            tts.language = tts.ENGLISH
+            tts.say('faild navigation')
+            tts.language = tts.JAPANESE
+            omni_base.go_abs(0, 0, 0, 180.0)
         tts.say(contents)
-        rospy.sleep(5)
+        rospy.sleep(7)
         
     def end_talk(self):
-        pass
+        try:
+            omni_base.go_abs(1.60, 1.73, 1.57, 180.0)
+            whole_body.move_to_joint_positions({"head_tilt_joint":0.2})
+        except:
+            rospy.logerr('Fail end_talk')
+            tts.language = tts.ENGLISH
+            tts.say('faild what can i do')
+            tts.language = tts.JAPANESE
+            omni_base.go_abs(0, 0, 0, 180.0)
         
 def main():
     demo = Demo()
@@ -85,6 +112,13 @@ def main():
     for unit in NAVI_SENARIO:
         demo.navi(unit[0], unit[1])
     rospy.sleep(5)
+    
+    demo.end_talk()
+    rospy.sleep(1)
+    
+    for unit in END_TALK_SENARIO:
+        demo.say_and_sleep(unit)
+    rospy.sleep(2)
     
 if __name__=='__main__':
     try:
