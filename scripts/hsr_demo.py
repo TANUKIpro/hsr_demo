@@ -90,12 +90,12 @@ class Demo():
             tts.say(u'まず僕の一通りの機能を紹介するよ')
             rospy.sleep(5)
             tts.say(u'まずは僕の足！先輩のASHIMOさんみたいに素敵な足はついてないけど、かわりにオムニホイールっていう、その場から全方向に移動可能な足がついてるんだ')
-            rospy.sleep(45)
+            rospy.sleep(17)
             tts.say(u'こんな風にその場で回ったり')
-            omni_base.go_abs(1.60, 1.73, -1.57, 180.0)
-            rospy.sleep(1)
-            omni_base.go_abs(1.60, 1.73, 1.57, 180.0)
-            rospy.sleep(1)
+            omni_base.go_abs(1.60, 1.73, -1.57, 10.0)
+            rospy.sleep(0.1)
+            omni_base.go_abs(1.60, 1.73, 1.57, 10.0)
+            rospy.sleep(0.1)
             
             tts.say(u'左右に移動できるんだ')
             omni_base.go_abs(1.60+0.7, 1.73, 1.57, 10.0)
@@ -107,6 +107,7 @@ class Demo():
             rospy.sleep(5)
             
             tts.say(u'説明するもの退屈だから、今から、そこにあるペットボトルをとってみせるね！')
+            whole_body.move_to_joint_positions({"head_tilt_joint":0.2})
             omni_base.go_abs(1.60, 1.73, 3.14, 180.0)
             rospy.logerr('success what_can_i_do')
             rospy.sleep(20)
@@ -145,9 +146,9 @@ class Demo():
             
 class Grep_the_bottle():
     def __init__(self):
-        tts.language = tts.ENGLISH
-        tts.say('go to table')
-        omni_base.go(-0.38838, 1.60785, -3.08466,20,relative=False)
+        #tts.language = tts.ENGLISH
+        #tts.say('go to table')
+        omni_base.go(-0.28838, 1.60785, -3.08466,20,relative=False)
         rospy.sleep(1)
         whole_body.move_to_neutral()
         gripper.grasp(0.01)
@@ -231,22 +232,19 @@ class Grep_the_bottle():
             omni_base.go(1.4842096504348206, 1.7556134149575287, 1.568438660836788,20,relative=False)
             whole_body.move_to_neutral()
             gripper.command(1)
-            
-            tts.say(u'どうだった？今のペットボトルをつかむという動作において、とっても沢山のセンサーを使ったんだ。')
+        except:
+            rospy.logerr('faild')
+            whole_body.move_to_neutral()
+            omni_base.go_abs()
+            '''
+            tts.say(u'ほえーー！なんかエラー出た！本当はペットボトルをつかむという動作において、とっても沢山のセンサーを使うんだ。')
             rospy.sleep(32)
             tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
             rospy.sleep(51)
-            
-        except:
-            rospy.logerr('faild')
-            #tts.say(u'ほえーー！なんかエラー出た！本当はペットボトルをつかむという動作において、とっても沢山のセンサーを使うんだ。')
-            rospy.sleep(32)
-            #tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
-            rospy.sleep(51)
-            
+            '''
 def main():
     demo = Demo()
-    """
+    '''
     demo.intro()#intro
     rospy.sleep(3)
     
@@ -254,17 +252,22 @@ def main():
         demo.say_and_sleep(unit)
     print('success intro')
     rospy.sleep(5)
-    
+    '''
     demo.what_can_i_do()#what_can_i_do
     print('success what_can_i_do')
     rospy.sleep(5)
-    """
+    
     Grep_the_bottle()#grep_the_bottle
-    gripper.command(1)
-    """
+    rospy.logerr('finish Grep_the_bottle')
+    
+    tts.say(u'どうだった？今のペットボトルをつかむという動作において、とっても沢山のセンサーを使ったんだ。')
+    rospy.sleep(32)
+    tts.say(u'ペットボトルを認識して、そこまでの距離を計算。腕をどれくらいまで伸ばさなきゃいけないのか。などなど。沢山の処理が僕のコンピューターで行われているんだ。')
+    rospy.sleep(20)
+    
     tts.say(u'次はロボット工房の案内をするよ！')
     rospy.sleep(6)
-    
+    '''
     for unit in NAVI_SENARIO:#navi
         demo.navi(unit[0], unit[1])
     print('success navigation')
@@ -277,7 +280,7 @@ def main():
         demo.say_and_sleep(unit)
     print('success end_talk')
     rospy.sleep(2)
-    """
+    '''
 if __name__=='__main__':
     try:
         whole_body.move_to_go()
@@ -286,9 +289,10 @@ if __name__=='__main__':
     main()
     tts.language = tts.ENGLISH
     #tts.say('All senario have ended. Move to the origin.')
-    rospy.sleep(50)
+    rospy.sleep(5)
     tts.language = tts.JAPANESE
     #omni_base.go_abs(-0.7, 0, 0, 180.0)
     whole_body.move_to_neutral()
     
     rospy.logerr('Finish')
+    exit()
