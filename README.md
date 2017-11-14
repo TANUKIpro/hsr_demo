@@ -11,7 +11,10 @@ rvizが起動したら、addからrobot_modelとmapを追加しておく。
 紫で囲った場所あたりを右クリックして**ToolProperties**を選択。**2D Pose Estimate**のTopicを`/laser_2d_correct_pose`に変更すること  
 ![rviz](https://github.com/TANUKIpro/img_dock/blob/master/rviz.png)  
 
-別のターミナルを開いて  
+HSRのターミナルを開いて  
+`$roslaunch bringup bringup.launch`
+コメント:bringupはとても沢山のモジュールをインポートしなくてはならないので、事前にGithubからcloneしておくのがおすすめ  
+ホストPCのターミナルを開いて  
 
     $hsrb_mode
     $source ~/catkin_ws/devel/setup.bash
