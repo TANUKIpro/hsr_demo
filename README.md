@@ -6,9 +6,9 @@ HSRはwifiをaibotに接続しておいたので、**ホストPCのwifiの接続
     $hsrb_mode
     $rosrun rviz rviz
 
-rvizが起動したら、addからrobot_modelとmapを追加しておく。マップのトピックは...  
+rvizが起動したら、addからrobot_modelとmapを追加しておく。
 
-紫で囲った場所あたりを右クリックして**ToolProperties**を選択。**2D Pose Estimate**のTopicを**/laser_2d_correct_pose**に変更すること
+紫で囲った場所あたりを右クリックして**ToolProperties**を選択。**2D Pose Estimate**のTopicを`/laser_2d_correct_pose`に変更すること  
 ![rviz](https://github.com/TANUKIpro/img_dock/blob/master/rviz.png)  
 
 別のターミナルを開いて  
