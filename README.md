@@ -1,18 +1,20 @@
+#HSR_DEMO
 ## 2017.11/11,12に開催のコスモス祭で使用するガバガバデモンストレーション
 
 最初に、HSRを原点まで移動させる。この際、rvizで自己位置を修正しなくてはならない。  
-HSRはwifiをaibotに接続しておいたので、**ホストPCのwifiの接続先を間違えないように。**
+HSRはwifiをaibotに接続しておいたので、**ホストPCのwifiの接続先を間違えないように。**(2017.11.10現在)
 
     $hsrb_mode
     $rosrun rviz rviz
 
 rvizが起動したら、addからrobot_modelとmapを追加しておく。
 
-紫で囲った場所あたりを右クリックして**ToolProperties**を選択。**2D Pose Estimate**のTopicを`/laser_2d_correct_pose`に変更すること  
+紫で囲った場所あたりを右クリックして**ToolProperties**を選択。**2D Pose Estimate**のTopicを`/laser_2d_correct_pose`に変更すること   
 ![rviz](https://github.com/TANUKIpro/img_dock/blob/master/rviz.png)  
+![rviz2](https://github.com/TANUKIpro/img_dock/blob/master/rviz2.png)
 
-HSRのターミナルを開いて  
-`$roslaunch bringup bringup.launch`
+HSRのターミナルを開いてbringupを起動する   
+`$roslaunch bringup bringup.launch`  
 コメント:bringupはとても沢山のモジュールをインポートしなくてはならないので、事前にGithubからcloneしておくのがおすすめ  
 ホストPCのターミナルを開いて  
 
