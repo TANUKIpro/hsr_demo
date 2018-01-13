@@ -15,7 +15,6 @@ rvizが起動したら、addからrobot_modelとmapを追加しておく。
 
 HSRのターミナルを開いてbringupを起動する   
 `$roslaunch bringup bringup.launch`  
-コメント:bringupはとても沢山のモジュールをインポートしなくてはならないので、事前にGithubからcloneしておくのがおすすめ  
 ホストPCのターミナルを開いて  
 
     $hsrb_mode
